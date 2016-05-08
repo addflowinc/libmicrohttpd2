@@ -3781,6 +3781,7 @@ MHD_start_daemon_va (unsigned int flags,
   daemon->connection_timeout = 0;       /* no timeout */
   daemon->wpipe[0] = MHD_INVALID_PIPE_;
   daemon->wpipe[1] = MHD_INVALID_PIPE_;
+  daemon->thread_number = -1;
 #ifdef SOMAXCONN
   daemon->listen_backlog_size = SOMAXCONN;
 #else  /* !SOMAXCONN */
@@ -4316,6 +4317,7 @@ MHD_start_daemon_va (unsigned int flags,
           d->master = daemon;
           d->worker_pool_size = 0;
           d->worker_pool = NULL;
+          d->thread_number = i;
 
           /* Always use individual control pipes */
           if (1)

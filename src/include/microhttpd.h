@@ -1967,6 +1967,17 @@ _MHD_EXTERN void
 MHD_resume_connection (struct MHD_Connection *connection);
 
 
+/**
+ * Return thread number from daemon associated for connection.
+ * Calling this function without thread pool will result in
+ * undefined behavior.
+ *
+ * @param connection the connection to resume
+ */
+_MHD_EXTERN int
+MHD_get_thread_number (struct MHD_Connection *connection);
+
+
 /* **************** Response manipulation functions ***************** */
 
 

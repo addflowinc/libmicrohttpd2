@@ -1311,6 +1311,11 @@ struct MHD_Daemon
    * The size of queue for listen socket.
    */
   unsigned int listen_backlog_size;
+
+  /**
+   *  Number of thread from threadpool
+   */
+  int thread_number;
 };
 
 

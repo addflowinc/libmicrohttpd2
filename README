@@ -23,6 +23,8 @@ error messages.
 Configure options
 =================
 
+./configure --disable-dauth --disable-postprocessor --disable-https --disable-spdy
+
 
 If you are concerned about space, you should set "CFLAGS" to "-Os
 -fomit-frame-pointer" to have gcc generate tight code.

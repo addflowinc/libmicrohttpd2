@@ -3124,4 +3124,21 @@ MHD_queue_response (struct MHD_Connection *connection,
 }
 
 
+/**
+ * Return thread number from daemon associated for connection.
+ * Calling this function without thread pool will result in
+ * undefined behavior.
+ *
+ * @param connection the connection to resume
+ */
+int
+MHD_get_thread_number (struct MHD_Connection *connection)
+{
+    if (connection && connection->daemon)
+        return connection->daemon->thread_number;
+
+    return -1;
+}
+
+
 /* end of connection.c */
