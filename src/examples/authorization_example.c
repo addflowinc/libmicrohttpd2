@@ -71,48 +71,38 @@ ahc_echo (void *cls,
   if (fail)
   {
       response = MHD_create_response_from_buffer (strlen (DENIED),
-						  (void *) DENIED,
+						  (void *) DENIED, 
 						  MHD_RESPMEM_PERSISTENT);
       ret = MHD_queue_basic_auth_fail_response (connection,"TestRealm",response);
     }
   else
     {
       response = MHD_create_response_from_buffer (strlen (me),
-						  (void *) me,
+						  (void *) me, 
 						  MHD_RESPMEM_PERSISTENT);
       ret = MHD_queue_response (connection, MHD_HTTP_OK, response);
     }
-  if (NULL != user)
-    free (user);
-  if (NULL != pass)
-    free (pass);
+
   MHD_destroy_response (response);
   return ret;
 }
-
 
 int
 main (int argc, char *const *argv)
 {
   struct MHD_Daemon *d;
-  unsigned int port;
 
-  if ( (argc != 2) ||
-       (1 != sscanf (argv[1], "%u", &port)) ||
-       (UINT16_MAX < port) )
+  if (argc != 3)
     {
-      fprintf (stderr,
-	       "%s PORT\n", argv[0]);
+      printf ("%s PORT SECONDS-TO-RUN\n", argv[0]);
       return 1;
     }
-
   d = MHD_start_daemon (MHD_USE_THREAD_PER_CONNECTION | MHD_USE_DEBUG,
                         atoi (argv[1]),
                         NULL, NULL, &ahc_echo, PAGE, MHD_OPTION_END);
   if (d == NULL)
     return 1;
-  fprintf (stderr, "HTTP server running. Press ENTER to stop the server\n");
-  (void) getc (stdin);
+  sleep (atoi (argv[2]));
   MHD_stop_daemon (d);
   return 0;
 }

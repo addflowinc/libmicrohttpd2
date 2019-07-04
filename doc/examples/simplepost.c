@@ -13,11 +13,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-#if defined(_MSC_VER) && _MSC_VER+0 <= 1800
-/* Substitution is OK while return value is not used */
-#define snprintf _snprintf
-#endif
-
 #define PORT            8888
 #define POSTBUFFERSIZE  512
 #define MAXNAMESIZE     20
@@ -36,7 +31,7 @@ struct connection_info_struct
 const char *askpage = "<html><body>\
                        What's your name, Sir?<br>\
                        <form action=\"/namepost\" method=\"post\">\
-                       <input name=\"name\" type=\"text\">\
+                       <input name=\"name\" type=\"text\"\
                        <input type=\"submit\" value=\" Send \"></form>\
                        </body></html>";
 

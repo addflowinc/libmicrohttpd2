@@ -11,7 +11,7 @@ This manual is for GNU libmicrohttpd
 (version @value{VERSION}, @value{UPDATED}), a library for embedding
 an HTTP(S) server into C applications.
 
-Copyright @copyright{} 2007--2015 Christian Grothoff
+Copyright @copyright{} 2007--2013 Christian Grothoff
 
 @quotation
 Permission is granted to copy, distribute and/or modify this document
@@ -100,23 +100,13 @@ library.
 
 The library is supposed to handle everything that it must handle
 (because the API would not allow clients to do this), such as basic
-connection management. However, detailed interpretations of headers,
-such as range requests, are left to the main application.  In
-particular, if an application developer wants to support range
-requests, he needs to explicitly indicate support in responses and
-also explicitly parse the range header and generate a response (for
-example, using the @code{MHD_create_response_from_fd_at_offset} call
-to serve ranges from a file).  MHD does understands headers that
-control connection management (specifically, @code{Connection: close}
-and @code{Expect: 100 continue} are understood and handled
-automatically).  @code{Connection: upgrade} is not yet supported.
-
-MHD also largely ignores the semantics of the different HTTP methods,
-so clients are left to handle those.  One exception is that MHD does
-understand @code{HEAD} and will only send the headers of the response
-and not the body, even if the client supplied a body.  (In fact,
-clients do need to construct a response with the correct length, even
-for @code{HEAD} request.)
+connection management; however, detailed interpretations of headers ---
+such as range requests --- and HTTP methods are left to clients.  The
+library does understand @code{HEAD} and will only send the headers of
+the response and not the body, even if the client supplied a body.  The
+library also understands headers that control connection management
+(specifically, @code{Connection: close} and @code{Expect: 100 continue}
+are understood and handled automatically).
 
 MHD understands @code{POST} data and is able to decode certain
 formats (at the moment only @code{application/x-www-form-urlencoded}
@@ -196,7 +186,7 @@ three processes on the same machine).
 Not all combinations of thread modes and event loop styles are
 supported.  This is partially to keep the API simple, and partially
 because some combinations simply make no sense as others are strictly
-superior.  Note that the choice of style depends first of all on the
+superior.  Note that the choice of style depends fist of all on the
 application logic, and then on the performance requirements.
 Applications that perform a blocking operation while handling a
 request within the callbacks from MHD must use a thread per
@@ -497,9 +487,9 @@ production.
 @cindex FD_SETSIZE
 @cindex poll
 @cindex select
-Use @code{poll()} instead of @code{select()}. This allows sockets with
-descriptors @code{>= FD_SETSIZE}.  This option currently only works in
-conjunction with @code{MHD_USE_THREAD_PER_CONNECTION} or
+Use poll instead of select. This allows sockets with descriptors
+@code{>= FD_SETSIZE}.  This option currently only works in conjunction
+with @code{MHD_USE_THREAD_PER_CONNECTION} or
 @code{MHD_USE_INTERNAL_SELECT} (at this point).  If you specify
 @code{MHD_USE_POLL} and the local platform does not support it,
 @code{MHD_start_daemon} will return NULL.
@@ -508,36 +498,16 @@ conjunction with @code{MHD_USE_THREAD_PER_CONNECTION} or
 @cindex FD_SETSIZE
 @cindex epoll
 @cindex select
-Use @code{epoll()} instead of @code{poll()} or @code{select()}. This
-allows sockets with descriptors @code{>= FD_SETSIZE}.  This option is
-only available on Linux systems and does not work in conjunction with
+Use epoll instead of poll or select. This allows sockets with
+descriptors @code{>= FD_SETSIZE}.  This option is only available on
+Linux systems and only works in conjunction with
 @code{MHD_USE_THREAD_PER_CONNECTION} (at this point).  If you specify
 @code{MHD_USE_EPOLL_LINUX_ONLY} and the local platform does not
-support it, @code{MHD_start_daemon} will return NULL.  Using
-@code{epoll()} instead of @code{select()} or @code{poll()} can in some
-situations result in significantly higher performance as the system
-call has fundamentally lower complexity (O(1) for @code{epoll()}
-vs. O(n) for @code{select()}/@code{poll()} where n is the number of
+support it, @code{MHD_start_daemon} will return NULL.  Using epoll
+instead of select or poll can in some situations result in significantly
+higher performance as the system call has fundamentally lower complexity
+(O(1) for epoll vs. O(n) for select/poll where n is the number of
 open connections).
-
-@item MHD_USE_EPOLL_TURBO
-@cindex performance
-Enable optimizations to aggressively improve performance.  Note that
-the option is a slight misnomer, as these days it also enables optimziations
-that are unrelated to @code{MHD_USE_EPOLL_LINUX_ONLY}.  Hence it is OK to
-use this option with other event loops.
-
-Currently, the optimizations this option enables are based on
-opportunistic reads and writes.  Bascially, MHD will simply try to
-read or write or accept on a socket before checking that the socket is
-ready for IO using the event loop mechanism.  As the sockets are
-non-blocking, this may fail (at a loss of performance), but generally
-MHD does this in situations where the operation is likely to succeed,
-in which case performance is improved.  Setting the flag should generally
-be safe (even though the code is slightly more experimental).  You may
-want to benchmark your application to see if this makes any difference
-for you.
-
 
 @item MHD_SUPPRESS_DATE_NO_CLOCK
 @cindex date
@@ -570,10 +540,6 @@ ability to signal termination via the listen socket).  In these modes,
 use of this option is automatic (as in, you do not even have to
 specify it), if @code{MHD_USE_NO_LISTEN_SOCKET} is specified.  In
 "external" select mode, this option is always simply ignored.
-
-Using this option also guarantees that MHD will not call
-@code{shutdown()} on the listen socket, which means a parent
-process can continue to use the socket.
 
 @item MHD_USE_SUSPEND_RESUME
 Enables using @code{MHD_suspend_connection} and
@@ -665,25 +631,6 @@ pointer to a function of type @code{MHD_RequestCompletedCallback()}
 and second a pointer to a closure to pass to the request completed
 callback.  The second pointer maybe @code{NULL}.
 
-@item MHD_OPTION_NOTIFY_CONNECTION
-Register a function that should be called when the TCP connection to a
-client is opened or closed.  Note that
-@code{MHD_OPTION_NOTIFY_COMPLETED} and the @code{con_cls} argument to
-the @code{MHD_AccessHandlerCallback} are per HTTP request (and there
-can be multiple HTTP requests per TCP connection).  The registered
-callback is called twice per TCP connection, with
-@code{MHD_CONNECTION_NOTIFY_STARTED} and
-@code{MHD_CONNECTION_NOTIFY_CLOSED} respectively.  An additional
-argument can be used to store TCP connection specific information,
-which can be retrieved using @code{MHD_CONNECTION_INFO_SOCKET_CONTEXT}
-during the lifetime of the TCP connection.  The respective location is
-not the same as the HTTP-request-specific @code{con_cls} from the
-@code{MHD_AccessHandlerCallback}.
-
-This option should be followed by @strong{TWO} pointers.  First a
-pointer to a function of type @code{MHD_NotifyConnectionCallback()}
-and second a pointer to a closure to pass to the request completed
-callback.  The second pointer maybe @code{NULL}.
 
 @item MHD_OPTION_PER_IP_CONNECTION_LIMIT
 Limit on the number of (concurrent) connections made to the
@@ -1607,9 +1554,7 @@ right now).
 
 
 @deftypefun int MHD_get_connection_values (struct MHD_Connection *connection, enum MHD_ValueKind kind, MHD_KeyValueIterator iterator, void *iterator_cls)
-Get all the headers matching @var{kind} from the request.  The @var{kind}
-argument can be a bitmask, ORing the various header kinds that are
-requested.
+Get all the headers matching @var{kind} from the request.
 
 The @var{iterator} callback is invoked once for each header, with
 @var{iterator_cls} as first argument.  After version 0.9.19, the
@@ -1635,7 +1580,7 @@ would contain the string ``key''.
 @end deftypefun
 
 
-@deftypefun int MHD_set_connection_value (struct MHD_Connection *connection, enum MHD_ValueKind kind, const char *key, const char *value)
+@deftypefun int MHD_set_connection_value (struct MHD_Connection *connection, enum MHD_ValueKind kind, const char * key, const char * value)
 This function can be used to append an entry to
 the list of HTTP headers of a connection (so that the
 @code{MHD_get_connection_values function} will return
@@ -2097,10 +2042,7 @@ connection is suspended, MHD will not detect disconnects by the
 client.
 
 The only safe time to suspend a connection is from the
-@code{MHD_AccessHandlerCallback} or from the respective
-@code{MHD_ContentReaderCallback} (but in this case the
-response object must not be shared among multiple
-connections).
+@code{MHD_AccessHandlerCallback}.
 
 Finally, it is an API violation to call @code{MHD_stop_daemon} while
 having suspended connections (this will at least create memory and
@@ -2636,14 +2578,6 @@ after sending the HTTP header and clear it after finishing the footers
 automatically (if the platform supports it).  As the connection
 callbacks are invoked in between, those might be used to set different
 values for TCP-CORK and TCP-NODELAY in the meantime.
-
-@item MHD_CONNECTION_INFO_SOCKET_CONTEXT
-Returns the client-specific pointer to a @code{void *} that was
-(possibly) set during a @code{MHD_NotifyConnectionCallback} when the
-socket was first accepted.  Note that this is NOT the same as the
-@code{con_cls} argument of the @code{MHD_AccessHandlerCallback}.  The
-@code{con_cls} is fresh for each HTTP request, while the
-@code{socket_context} is fresh for each socket.
 
 @end table
 @end deftp

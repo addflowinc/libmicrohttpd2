@@ -1,6 +1,6 @@
 /*
      This file is part of libmicrohttpd
-     Copyright (C) 2013, 2015 Christian Grothoff
+     Copyright (C) 2013 Christian Grothoff
 
      libmicrohttpd is free software; you can redistribute it and/or modify
      it under the terms of the GNU General Public License as published
@@ -14,11 +14,12 @@
 
      You should have received a copy of the GNU General Public License
      along with libmicrohttpd; see the file COPYING.  If not, write to the
-     Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
-     Boston, MA 02110-1301, USA.
+     Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+     Boston, MA 02111-1307, USA.
 */
+
 /**
- * @file test_quiesce.c
+ * @file daemontest_quiesce.c
  * @brief  Testcase for libmicrohttpd quiescing
  * @author Christian Grothoff
  */
@@ -45,6 +46,8 @@
 #if !defined(CPU_COUNT)
 #define CPU_COUNT 2
 #endif
+
+static int oneone;
 
 
 struct CBC
@@ -150,14 +153,9 @@ ServeOneRequest(void *param)
       MHD_SYS_select_ (max + 1, &rs, &ws, &es, &tv);
       MHD_run (d);
     }
-  fd = MHD_quiesce_daemon (d);
-  if (MHD_INVALID_SOCKET == fd)
-    {
-      MHD_stop_daemon (d);
-      return "MHD_quiesce_daemon() failed in ServeOneRequest()";
-    }
   MHD_stop_daemon (d);
-  return done ? NULL : "Requests was not served by ServeOneRequest()";
+  MHD_socket_close_(fd);
+  return NULL;
 }
 
 
@@ -173,7 +171,10 @@ setupCURL (void *cbc)
   curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
   curl_easy_setopt (c, CURLOPT_TIMEOUT_MS, 150L);
   curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT_MS, 150L);
-  curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+  if (oneone)
+    curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+  else
+    curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
   /* NOTE: use of CONNECTTIMEOUT without also
      setting NOSIGNAL results in really weird
      crashes on my system!*/
@@ -234,14 +235,6 @@ testGet (int type, int pool_count, int poll_flag)
   }
 
   fd = MHD_quiesce_daemon (d);
-  if (MHD_INVALID_SOCKET == fd)
-    {
-      fprintf (stderr,
-               "MHD_quiesce_daemon failed.\n");
-      curl_easy_cleanup (c);
-      MHD_stop_daemon (d);
-      return 2;
-    }
   if (0 != pthread_create(&thrd, NULL, &ServeOneRequest, (void*)(intptr_t) fd))
     {
       fprintf (stderr, "pthread_create failed\n");
@@ -324,12 +317,7 @@ testExternalGet ()
   fd_set rs;
   fd_set ws;
   fd_set es;
-  MHD_socket maxsock;
-#ifdef MHD_WINSOCK_SOCKETS
-  int maxposixs; /* Max socket number unused on W32 */
-#else  /* MHD_POSIX_SOCKETS */
-#define maxposixs maxsock
-#endif /* MHD_POSIX_SOCKETS */
+  MHD_socket max;
   int running;
   struct CURLMsg *msg;
   time_t start;
@@ -367,13 +355,12 @@ testExternalGet ()
     start = time (NULL);
     while ((time (NULL) - start < 5) && (multi != NULL))
       {
-        maxsock = MHD_INVALID_SOCKET;
-        maxposixs = -1;
+        max = 0;
         FD_ZERO (&rs);
         FD_ZERO (&ws);
         FD_ZERO (&es);
         curl_multi_perform (multi, &running);
-        mret = curl_multi_fdset (multi, &rs, &ws, &es, &maxposixs);
+        mret = curl_multi_fdset (multi, &rs, &ws, &es, &max);
         if (mret != CURLM_OK)
           {
             curl_multi_remove_handle (multi, c);
@@ -382,7 +369,7 @@ testExternalGet ()
             MHD_stop_daemon (d);
             return 2048;
           }
-        if (MHD_YES != MHD_get_fdset (d, &rs, &ws, &es, &maxsock))
+        if (MHD_YES != MHD_get_fdset (d, &rs, &ws, &es, &max))
           {
             curl_multi_remove_handle (multi, c);
             curl_multi_cleanup (multi);
@@ -392,7 +379,7 @@ testExternalGet ()
           }
         tv.tv_sec = 0;
         tv.tv_usec = 1000;
-        select (maxposixs + 1, &rs, &ws, &es, &tv);
+        select (max + 1, &rs, &ws, &es, &tv);
         curl_multi_perform (multi, &running);
         if (running == 0)
           {
@@ -424,27 +411,12 @@ testExternalGet ()
       if (i == 0) {
         /* quiesce the daemon on the 1st iteration, so the 2nd should fail */
         fd = MHD_quiesce_daemon(d);
-        if (MHD_INVALID_SOCKET == fd)
-          {
-            fprintf (stderr,
-                     "MHD_quiesce_daemon failed.\n");
-            curl_multi_remove_handle (multi, c);
-            curl_multi_cleanup (multi);
-            curl_easy_cleanup (c);
-            MHD_stop_daemon (d);
-            return 2;
-          }
+	if (MHD_INVALID_SOCKET == fd)
+	  abort ();
+	MHD_socket_close_ (fd);
         c = setupCURL (&cbc);
         multi = curl_multi_init ();
         mret = curl_multi_add_handle (multi, c);
-        if (mret != CURLM_OK)
-        {
-          curl_multi_remove_handle (multi, c);
-          curl_multi_cleanup (multi);
-          curl_easy_cleanup (c);
-          MHD_stop_daemon (d);
-          return 32768;
-        }
       }
     }
   if (multi != NULL)
@@ -454,7 +426,6 @@ testExternalGet ()
       curl_multi_cleanup (multi);
     }
   MHD_stop_daemon (d);
-  MHD_socket_close_ (fd);
   if (cbc.pos != strlen ("/hello_world"))
     return 8192;
   if (0 != strncmp ("/hello_world", cbc.buf, strlen ("/hello_world")))
@@ -468,23 +439,22 @@ main (int argc, char *const *argv)
 {
   unsigned int errorCount = 0;
 
+  oneone = NULL != strstr (argv[0], "11");
   if (0 != curl_global_init (CURL_GLOBAL_WIN32))
     return 2;
   errorCount += testGet (MHD_USE_SELECT_INTERNALLY, 0, 0);
   errorCount += testGet (MHD_USE_THREAD_PER_CONNECTION, 0, 0);
   errorCount += testGet (MHD_USE_SELECT_INTERNALLY, CPU_COUNT, 0);
   errorCount += testExternalGet ();
-  if (MHD_YES == MHD_is_feature_supported(MHD_FEATURE_POLL))
-    {
-      errorCount += testGet(MHD_USE_SELECT_INTERNALLY, 0, MHD_USE_POLL);
-      errorCount += testGet (MHD_USE_THREAD_PER_CONNECTION, 0, MHD_USE_POLL);
-      errorCount += testGet (MHD_USE_SELECT_INTERNALLY, CPU_COUNT, MHD_USE_POLL);
-    }
-  if (MHD_YES == MHD_is_feature_supported(MHD_FEATURE_EPOLL))
-    {
-      errorCount += testGet (MHD_USE_SELECT_INTERNALLY, 0, MHD_USE_EPOLL_LINUX_ONLY);
-      errorCount += testGet (MHD_USE_SELECT_INTERNALLY, CPU_COUNT, MHD_USE_EPOLL_LINUX_ONLY);
-    }
+#ifndef WINDOWS
+  errorCount += testGet (MHD_USE_SELECT_INTERNALLY, 0, MHD_USE_POLL);
+  errorCount += testGet (MHD_USE_THREAD_PER_CONNECTION, 0, MHD_USE_POLL);
+  errorCount += testGet (MHD_USE_SELECT_INTERNALLY, CPU_COUNT, MHD_USE_POLL);
+#endif
+#if EPOLL_SUPPORT
+  errorCount += testGet (MHD_USE_SELECT_INTERNALLY, 0, MHD_USE_EPOLL_LINUX_ONLY);
+  errorCount += testGet (MHD_USE_SELECT_INTERNALLY, CPU_COUNT, MHD_USE_EPOLL_LINUX_ONLY);
+#endif
   if (errorCount != 0)
     fprintf (stderr, "Error (code: %u)\n", errorCount);
   curl_global_cleanup ();

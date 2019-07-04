@@ -14,12 +14,12 @@
 
      You should have received a copy of the GNU General Public License
      along with libmicrohttpd; see the file COPYING.  If not, write to the
-     Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
-     Boston, MA 02110-1301, USA.
+     Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+     Boston, MA 02111-1307, USA.
 */
 
 /**
- * @file test_iplimit.c
+ * @file daemontest_get.c
  * @brief  Testcase for libmicrohttpd GET operations
  *         TODO: test parsing of query
  * @author Christian Grothoff
@@ -110,16 +110,13 @@ testMultithreadedGet ()
   struct MHD_Daemon *d;
   char buf[2048];
   int k;
-  unsigned int success;
-  unsigned int failure;
 
   /* Test only valid for HTTP/1.1 (uses persistent connections) */
   if (!oneone)
     return 0;
 
   d = MHD_start_daemon (MHD_USE_SELECT_INTERNALLY | MHD_USE_DEBUG,
-                        1081, NULL, NULL,
-                        &ahc_echo, "GET",
+                        1081, NULL, NULL, &ahc_echo, "GET",
                         MHD_OPTION_PER_IP_CONNECTION_LIMIT, 2,
                         MHD_OPTION_END);
   if (d == NULL)
@@ -131,13 +128,11 @@ testMultithreadedGet ()
       CURL *cenv[3];
       int i;
 
-      success = 0;
-      failure = 0;
       for (i = 0; i < 3; ++i)
         {
           CURL *c;
           CURLcode errornum;
-
+ 
           cenv[i] = c = curl_easy_init ();
           cbc[i].buf = buf;
           cbc[i].size = 2048;
@@ -157,25 +152,32 @@ testMultithreadedGet ()
           curl_easy_setopt (c, CURLOPT_NOSIGNAL, 1);
 
           errornum = curl_easy_perform (c);
-          if (CURLE_OK == errornum)
-            success++;
-          else
-            failure++;
+          if ( ( (CURLE_OK != errornum) && (i <  2) ) ||
+	       ( (CURLE_OK == errornum) && (i == 2) ) )
+            {
+              int j;
+
+              /* First 2 should succeed */
+              if (i < 2)
+                fprintf (stderr,
+                         "curl_easy_perform failed: `%s'\n",
+                         curl_easy_strerror (errornum));
+
+              /* Last request should have failed */
+              else
+                fprintf (stderr,
+                         "No error on IP address over limit\n");
+
+              for (j = 0; j < i; ++j)
+                curl_easy_cleanup (cenv[j]);
+              MHD_stop_daemon (d);
+              return 32;
+            }
         }
 
       /* Cleanup the environments */
       for (i = 0; i < 3; ++i)
         curl_easy_cleanup (cenv[i]);
-      if ( (2 != success) ||
-           (1 != failure) )
-      {
-        fprintf (stderr,
-                 "Unexpected number of success (%u) or failure (%u)\n",
-                 success,
-                 failure);
-        MHD_stop_daemon (d);
-        return 32;
-      }
 
       sleep(2);
 
@@ -192,6 +194,8 @@ testMultithreadedGet ()
               return 128;
             }
         }
+
+
     }
   MHD_stop_daemon (d);
   return 0;
@@ -226,7 +230,7 @@ testMultithreadedPoolGet ()
         {
           CURL *c;
           CURLcode errornum;
-
+ 
           cenv[i] = c = curl_easy_init ();
           cbc[i].buf = buf;
           cbc[i].size = 2048;
@@ -300,12 +304,11 @@ main (int argc, char *const *argv)
 {
   unsigned int errorCount = 0;
 
-  oneone = (NULL != strrchr (argv[0], (int) '/')) ?
-    (NULL != strstr (strrchr (argv[0], (int) '/'), "11")) : 0;
+  oneone = NULL != strstr (argv[0], "11");
   if (0 != curl_global_init (CURL_GLOBAL_WIN32))
     return 2;
-  errorCount |= testMultithreadedGet ();
-  errorCount |= testMultithreadedPoolGet ();
+  errorCount += testMultithreadedGet ();
+  errorCount += testMultithreadedPoolGet ();
   if (errorCount != 0)
     fprintf (stderr, "Error (code: %u)\n", errorCount);
   curl_global_cleanup ();

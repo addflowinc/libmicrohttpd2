@@ -24,7 +24,6 @@
  */
 
 #include "internal.h"
-#include "mhd_str.h"
 
 /**
  * Size of on-stack buffer that we use for un-escaping of the value.
@@ -541,7 +540,7 @@ find_boundary (struct MHD_PostProcessor *pp,
     {
       if (pp->buffer_pos == pp->buffer_size)
         pp->state = PP_Error;   /* out of memory */
-      /* ++(*ioffptr); */
+      // ++(*ioffptr);
       return MHD_NO;            /* not enough data */
     }
   if ((0 != memcmp ("--", buf, 2)) || (0 != memcmp (&buf[2], boundary, blen)))

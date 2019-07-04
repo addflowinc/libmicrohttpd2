@@ -14,8 +14,8 @@
 
  You should have received a copy of the GNU General Public License
  along with libmicrohttpd; see the file COPYING.  If not, write to the
- Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
- Boston, MA 02110-1301, USA.
+ Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+ Boston, MA 02111-1307, USA.
  */
 
 /**
@@ -84,12 +84,7 @@ testExternalGet (int flags)
   fd_set rs;
   fd_set ws;
   fd_set es;
-  MHD_socket maxsock;
-#ifdef MHD_WINSOCK_SOCKETS
-  int maxposixs; /* Max socket number unused on W32 */
-#else  /* MHD_POSIX_SOCKETS */
-#define maxposixs maxsock
-#endif /* MHD_POSIX_SOCKETS */
+  MHD_socket max;
   int running;
   struct CURLMsg *msg;
   time_t start;
@@ -116,7 +111,7 @@ testExternalGet (int flags)
   curl_easy_setopt (c, CURLOPT_WRITEFUNCTION, &copyBuffer);
   curl_easy_setopt (c, CURLOPT_WRITEDATA, &cbc);
   /* TLS options */
-  curl_easy_setopt (c, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1);
+  curl_easy_setopt (c, CURLOPT_SSLVERSION, CURL_SSLVERSION_SSLv3);
   curl_easy_setopt (c, CURLOPT_SSL_CIPHER_LIST, aes256_sha);
   curl_easy_setopt (c, CURLOPT_SSL_VERIFYPEER, 0);
   curl_easy_setopt (c, CURLOPT_SSL_VERIFYHOST, 0);
@@ -151,12 +146,11 @@ testExternalGet (int flags)
   start = time (NULL);
   while ((time (NULL) - start < 5) && (multi != NULL))
     {
-      maxsock = MHD_INVALID_SOCKET;
-      maxposixs = -1;
+      max = 0;
       FD_ZERO (&rs);
       FD_ZERO (&ws);
       FD_ZERO (&es);
-      mret = curl_multi_fdset (multi, &rs, &ws, &es, &maxposixs);
+      mret = curl_multi_fdset (multi, &rs, &ws, &es, &max);
       if (mret != CURLM_OK)
         {
           curl_multi_remove_handle (multi, c);
@@ -165,7 +159,7 @@ testExternalGet (int flags)
           MHD_stop_daemon (d);
           return 2048;
         }
-      if (MHD_YES != MHD_get_fdset (d, &rs, &ws, &es, &maxsock))
+      if (MHD_YES != MHD_get_fdset (d, &rs, &ws, &es, &max))
         {
           curl_multi_remove_handle (multi, c);
           curl_multi_cleanup (multi);
@@ -175,7 +169,7 @@ testExternalGet (int flags)
         }
       tv.tv_sec = 0;
       tv.tv_usec = 1000;
-      select (maxposixs + 1, &rs, &ws, &es, &tv);
+      select (max + 1, &rs, &ws, &es, &tv);
       curl_multi_perform (multi, &running);
       if (running == 0)
         {

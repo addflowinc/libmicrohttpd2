@@ -125,7 +125,6 @@ http_ahc (void *cls,
   struct MHD_Response *response;
   int ret;
   FILE *file;
-  int fd;
   struct stat buf;
 
   if (0 != strcmp (method, MHD_HTTP_METHOD_GET))
@@ -138,25 +137,12 @@ http_ahc (void *cls,
     }
   *ptr = NULL;                  /* reset when done */
 
-  file = fopen (&url[1], "rb");
-  if (NULL != file)
-    {
-      fd = fileno (file);
-      if (-1 == fd)
-        {
-          (void) fclose (file);
-          return MHD_NO; /* internal error */
-        }
-      if ( (0 != fstat (fd, &buf)) ||
-           (! S_ISREG (buf.st_mode)) )
-        {
-          /* not a regular file, refuse to serve */
-          fclose (file);
-          file = NULL;
-        }
-    }
-
-  if (NULL == file)
+  if ( (0 == stat (&url[1], &buf)) &&
+       (S_ISREG (buf.st_mode)) )
+    file = fopen (&url[1], "rb");
+  else
+    file = NULL;
+  if (file == NULL)
     {
       response = MHD_create_response_from_buffer (strlen (EMPTY_PAGE),
 						  (void *) EMPTY_PAGE,
@@ -169,7 +155,7 @@ http_ahc (void *cls,
       response = MHD_create_response_from_callback (buf.st_size, 32 * 1024,     /* 32k PAGE_NOT_FOUND size */
                                                     &file_reader, file,
                                                     &file_free_callback);
-      if (NULL == response)
+      if (response == NULL)
 	{
 	  fclose (file);
 	  return MHD_NO;
@@ -179,7 +165,6 @@ http_ahc (void *cls,
     }
   return ret;
 }
-
 
 int
 main (int argc, char *const *argv)

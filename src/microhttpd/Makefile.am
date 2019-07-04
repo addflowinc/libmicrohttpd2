@@ -58,14 +58,10 @@ endif
 
 libmicrohttpd_la_SOURCES = \
   connection.c connection.h \
-  reason_phrase.c \
+  reason_phrase.c reason_phrase.h \
   daemon.c  \
   internal.c internal.h \
   memorypool.c memorypool.h \
-  mhd_mono_clock.c mhd_mono_clock.h \
-  mhd_limits.h mhd_byteorder.h \
-  sysfdsetsize.c sysfdsetsize.h \
-  mhd_str.c mhd_str.h \
   response.c response.h
 libmicrohttpd_la_CPPFLAGS = \
   $(AM_CPPFLAGS) $(MHD_LIB_CPPFLAGS) \
@@ -78,8 +74,6 @@ libmicrohttpd_la_LDFLAGS = \
   -version-info @LIB_VERSION_CURRENT@:@LIB_VERSION_REVISION@:@LIB_VERSION_AGE@
 libmicrohttpd_la_LIBADD = \
   $(MHD_W32_LIB) $(MHD_LIBDEPS)
-libmicrohttpd_la_DEPENDENCIES = \
-  $(MHD_W32_LIB)
 
 if HAVE_W32
 MHD_DLL_RES_SRC = microhttpd_dll_res.rc
@@ -140,8 +134,6 @@ endif
 
 
 check_PROGRAMS = \
-  test_shutdown_select \
-  test_shutdown_poll \
   test_daemon
 
 if HAVE_POSTPROCESSOR
@@ -152,12 +144,6 @@ check_PROGRAMS += \
 endif
 
 TESTS = $(check_PROGRAMS)
-
-if !HAVE_LISTEN_SHUTDOWN
-XFAIL_TESTS = \
-  test_shutdown_select \
-  test_shutdown_poll
-endif
 
 test_daemon_SOURCES = \
   test_daemon.c
@@ -186,21 +172,3 @@ test_postprocessor_large_CPPFLAGS = \
 test_postprocessor_large_LDADD = \
   $(top_builddir)/src/microhttpd/libmicrohttpd.la \
   $(MHD_W32_LIB)
-
-test_shutdown_select_SOURCES = \
-  test_shutdown_select.c
-if USE_POSIX_THREADS
-test_shutdown_select_CFLAGS = \
-  $(AM_CFLAGS) $(PTHREAD_CFLAGS)
-test_shutdown_select_LDADD = \
-  $(PTHREAD_LIBS)
-endif
-
-test_shutdown_poll_SOURCES = \
-  test_shutdown_select.c
-if USE_POSIX_THREADS
-test_shutdown_poll_CFLAGS = \
-  $(AM_CFLAGS) $(PTHREAD_CFLAGS)
-test_shutdown_poll_LDADD = \
-  $(PTHREAD_LIBS)
-endif

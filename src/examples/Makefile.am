@@ -13,6 +13,17 @@ if USE_COVERAGE
   AM_CFLAGS += --coverage
 endif
 
+if ENABLE_SPDY
+spdyex = \
+  spdy_event_loop \
+  spdy_fileserver \
+  spdy_response_with_callback
+
+if HAVE_SPDYLAY
+spdyex += mhd2spdy
+endif
+endif
+
 
 # example programs
 noinst_PROGRAMS = \
@@ -23,11 +34,11 @@ noinst_PROGRAMS = \
  dual_stack_example \
  minimal_example_comet \
  querystring_example \
- timeout \
  fileserver_example \
  fileserver_example_dirs \
  fileserver_example_external_select \
- refuse_post_example
+ refuse_post_example \
+ $(spdyex)
 
 
 if ENABLE_HTTPS
@@ -37,9 +48,8 @@ if HAVE_POSTPROCESSOR
 noinst_PROGRAMS += \
   post_example
 if HAVE_MAGIC
-noinst_PROGRAMS += \
-  demo \
-  demo_https
+bin_PROGRAMS = \
+  demo
 endif
 endif
 
@@ -62,11 +72,6 @@ minimal_example_SOURCES = \
 minimal_example_LDADD = \
  $(top_builddir)/src/microhttpd/libmicrohttpd.la
 
-timeout_SOURCES = \
- timeout.c
-timeout_LDADD = \
- $(top_builddir)/src/microhttpd/libmicrohttpd.la
-
 chunked_example_SOURCES = \
  chunked_example.c
 chunked_example_LDADD = \
@@ -82,15 +87,14 @@ demo_LDADD = \
  $(top_builddir)/src/microhttpd/libmicrohttpd.la  \
  $(PTHREAD_LIBS) -lmagic
 
-demo_https_SOURCES = \
- demo_https.c
-demo_https_CFLAGS = \
- $(PTHREAD_CFLAGS) $(AM_CFLAGS)
-demo_https_CPPFLAGS = \
- $(AM_CPPFLAGS) $(CPU_COUNT_DEF)
-demo_https_LDADD = \
+mhd2spdy_SOURCES = \
+ mhd2spdy.c \
+ mhd2spdy_spdy.c mhd2spdy_spdy.h \
+ mhd2spdy_http.c mhd2spdy_http.h \
+ mhd2spdy_structures.c mhd2spdy_structures.h
+mhd2spdy_LDADD = \
  $(top_builddir)/src/microhttpd/libmicrohttpd.la  \
- $(PTHREAD_LIBS) -lmagic
+ -lssl -lcrypto -lspdylay
 
 benchmark_SOURCES = \
  benchmark.c
@@ -162,3 +166,22 @@ https_fileserver_example_CPPFLAGS = \
  $(AM_CPPFLAGS) $(GNUTLS_CPPFLAGS)
 https_fileserver_example_LDADD = \
  $(top_builddir)/src/microhttpd/libmicrohttpd.la
+
+
+spdy_event_loop_SOURCES = \
+ spdy_event_loop.c
+spdy_event_loop_LDADD = \
+  $(top_builddir)/src/microspdy/libmicrospdy.la \
+ -lz
+
+spdy_fileserver_SOURCES = \
+ spdy_fileserver.c
+spdy_fileserver_LDADD = \
+  $(top_builddir)/src/microspdy/libmicrospdy.la \
+ -lz
+
+spdy_response_with_callback_SOURCES = \
+ spdy_response_with_callback.c
+spdy_response_with_callback_LDADD = \
+  $(top_builddir)/src/microspdy/libmicrospdy.la \
+ -lz

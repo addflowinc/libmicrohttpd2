@@ -14,66 +14,62 @@
 
      You should have received a copy of the GNU General Public License
      along with libmicrohttpd; see the file COPYING.  If not, write to the
-     Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
-     Boston, MA 02110-1301, USA.
+     Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+     Boston, MA 02111-1307, USA.
 */
+
 /**
  * @file test_callback.c
  * @brief Testcase for MHD not calling the callback too often
- * @author Jan Seeger
+ * @author Jan Seeger 
  * @author Christian Grothoff
  */
+
+
 #include "MHD_config.h"
 #include "platform.h"
 #include <curl/curl.h>
 #include <microhttpd.h>
 
-struct callback_closure
-{
+struct callback_closure {
   unsigned int called;
 };
 
 
-static ssize_t
-called_twice(void *cls, uint64_t pos, char *buf, size_t max)
+static ssize_t 
+called_twice(void *cls, uint64_t pos, char *buf, size_t max) 
 {
   struct callback_closure *cls2 = cls;
-
-  if (cls2->called == 0)
+  
+  if (cls2->called == 0) 
     {
       memset(buf, 0, max);
       strcat(buf, "test");
       cls2->called = 1;
       return strlen(buf);
     }
-  if (cls2->called == 1)
+  if (cls2->called == 1) 
     {
       cls2->called = 2;
       return MHD_CONTENT_READER_END_OF_STREAM;
     }
-  fprintf(stderr,
+  fprintf(stderr, 
 	  "Handler called after returning END_OF_STREAM!\n");
   return MHD_CONTENT_READER_END_WITH_ERROR;
 }
 
 
 static int
-callback(void *cls,
-         struct MHD_Connection *connection,
-         const char *url,
-	 const char *method,
-         const char *version,
-         const char *upload_data,
-	 size_t *upload_data_size,
-         void **con_cls)
-{
+callback(void *cls, struct MHD_Connection *connection, const char *url,
+	 const char *method, const char *version, const char *upload_data,
+	 size_t *upload_data_size, void **con_cls) {
   struct callback_closure *cbc = calloc(1, sizeof(struct callback_closure));
   struct MHD_Response *r;
 
-  r = MHD_create_response_from_callback (MHD_SIZE_UNKNOWN, 1024,
-					 &called_twice, cbc,
+  r = MHD_create_response_from_callback (MHD_SIZE_UNKNOWN, 1024, 
+					 &called_twice, cbc, 
 					 &free);
-  MHD_queue_response(connection, MHD_HTTP_OK, r);
+  MHD_queue_response(connection, 200, r);
   MHD_destroy_response(r);
   return MHD_YES;
 }
@@ -86,19 +82,13 @@ discard_buffer (void *ptr, size_t size, size_t nmemb, void *ctx)
 }
 
 
-int
-main(int argc, char **argv)
+int main(int argc, char **argv) 
 {
   struct MHD_Daemon *d;
   fd_set rs;
   fd_set ws;
   fd_set es;
-  MHD_socket maxsock;
-#ifdef MHD_WINSOCK_SOCKETS
-  int maxposixs; /* Max socket number unused on W32 */
-#else  /* MHD_POSIX_SOCKETS */
-#define maxposixs maxsock
-#endif /* MHD_POSIX_SOCKETS */
+  MHD_socket max;
   CURL *c;
   CURLM *multi;
   CURLMcode mret;
@@ -107,11 +97,11 @@ main(int argc, char **argv)
   struct timeval tv;
   int extra;
 
-  d = MHD_start_daemon(0,
+  d = MHD_start_daemon(0, 
 		       8000,
 		       NULL,
 		       NULL,
-		       &callback,
+		       callback,
 		       NULL,
 		       MHD_OPTION_END);
   c = curl_easy_init ();
@@ -140,15 +130,14 @@ main(int argc, char **argv)
   extra = 10;
   while ( (c != NULL) || (--extra > 0) )
     {
-      maxsock = MHD_INVALID_SOCKET;
-      maxposixs = -1;
+      max = MHD_INVALID_SOCKET;
       FD_ZERO(&ws);
       FD_ZERO(&rs);
       FD_ZERO(&es);
       curl_multi_perform (multi, &running);
       if (NULL != multi)
 	{
-	  mret = curl_multi_fdset (multi, &rs, &ws, &es, &maxposixs);
+	  mret = curl_multi_fdset (multi, &rs, &ws, &es, &max);
 	  if (mret != CURLM_OK)
 	    {
 	      curl_multi_remove_handle (multi, c);
@@ -156,10 +145,10 @@ main(int argc, char **argv)
 	      curl_easy_cleanup (c);
 	      MHD_stop_daemon (d);
 	      return 3;
-	    }
+	    }   
 	}
       if (MHD_YES !=
-	  MHD_get_fdset(d, &rs, &ws, &es, &maxsock))
+	  MHD_get_fdset(d, &rs, &ws, &es, &max))
 	{
           curl_multi_remove_handle (multi, c);
           curl_multi_cleanup (multi);
@@ -169,7 +158,7 @@ main(int argc, char **argv)
 	}
       tv.tv_sec = 0;
       tv.tv_usec = 1000;
-      select(maxposixs + 1, &rs, &ws, &es, &tv);
+      select(max + 1, &rs, &ws, &es, &tv);
       if (NULL != multi)
 	{
 	  curl_multi_perform (multi, &running);

@@ -17,6 +17,7 @@ AM_CPPFLAGS = \
 $(LIBCURL_CPPFLAGS)
 
 if !HAVE_W32
+PERF_GET_CONCURRENT=perf_get_concurrent
 if HAVE_CURL_BINARY
 CURL_FORK_TEST = test_get_response_cleanup
 endif
@@ -46,13 +47,11 @@ check_PROGRAMS = \
   test_timeout \
   test_callback \
   $(CURL_FORK_TEST) \
-  perf_get
+  perf_get $(PERF_GET_CONCURRENT)
 
 if HAVE_POSIX_THREADS
 check_PROGRAMS += \
-  test_quiesce \
-  test_concurrent_stop \
-  perf_get_concurrent
+  test_quiesce
 endif
 
 if HAVE_POSTPROCESSOR
@@ -85,14 +84,6 @@ test_start_stop_SOURCES = \
   test_start_stop.c
 test_start_stop_LDADD = \
   $(top_builddir)/src/microhttpd/libmicrohttpd.la
-
-test_concurrent_stop_SOURCES = \
-  test_concurrent_stop.c
-test_concurrent_stop_CFLAGS = \
-  $(PTHREAD_CFLAGS) $(AM_CFLAGS)
-test_concurrent_stop_LDADD = \
-  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
-  $(PTHREAD_LIBS) @LIBCURL@
 
 test_options_SOURCES = \
   test_options.c
@@ -129,11 +120,9 @@ perf_get_LDADD = \
 perf_get_concurrent_SOURCES = \
   perf_get_concurrent.c \
   gauger.h
-perf_get_concurrent_CFLAGS = \
-  $(PTHREAD_CFLAGS) $(AM_CFLAGS)
 perf_get_concurrent_LDADD = \
   $(top_builddir)/src/microhttpd/libmicrohttpd.la \
-  $(PTHREAD_LIBS) @LIBCURL@
+  @LIBCURL@
 
 test_digestauth_SOURCES = \
   test_digestauth.c
@@ -152,12 +141,8 @@ test_get_sendfile_SOURCES = \
 test_get_sendfile_LDADD = \
   $(top_builddir)/src/microhttpd/libmicrohttpd.la \
   @LIBCURL@
-test_get_sendfile_DEPENDENCIES =
-
 if HAVE_W32
 test_get_sendfile_LDADD += \
- $(top_builddir)/src/platform/libplatform_interface.la
-test_get_sendfile_DEPENDENCIES += \
  $(top_builddir)/src/platform/libplatform_interface.la
 endif
 
@@ -237,12 +222,8 @@ test_get_sendfile11_SOURCES = \
 test_get_sendfile11_LDADD = \
   $(top_builddir)/src/microhttpd/libmicrohttpd.la \
   @LIBCURL@
-test_get_sendfile11_DEPENDENCIES =
-
 if HAVE_W32
 test_get_sendfile11_LDADD += \
-  $(top_builddir)/src/platform/libplatform_interface.la
-test_get_sendfile11_DEPENDENCIES += \
   $(top_builddir)/src/platform/libplatform_interface.la
 endif
 
@@ -311,3 +292,4 @@ test_timeout_SOURCES = \
 test_timeout_LDADD = \
   $(top_builddir)/src/microhttpd/libmicrohttpd.la \
   @LIBCURL@
+

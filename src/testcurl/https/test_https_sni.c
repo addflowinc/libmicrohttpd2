@@ -1,6 +1,6 @@
 /*
   This file is part of libmicrohttpd
-  Copyright (C) 2013, 2016 Christian Grothoff
+  Copyright (C) 2013 Christian Grothoff
 
   libmicrohttpd is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published
@@ -14,8 +14,8 @@
 
   You should have received a copy of the GNU General Public License
   along with libmicrohttpd; see the file COPYING.  If not, write to the
-  Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
-  Boston, MA 02110-1301, USA.
+  Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+  Boston, MA 02111-1307, USA.
 */
 
 /**
@@ -256,7 +256,7 @@ main (int argc, char *const *argv)
   if (0 != curl_global_init (CURL_GLOBAL_ALL))
     {
       fprintf (stderr, "Error: %s\n", strerror (errno));
-      return 77;
+      return -1;
     }
   load_keys ("host1", ABS_SRCDIR "/host1.crt", ABS_SRCDIR "/host1.key");
   load_keys ("host2", ABS_SRCDIR "/host2.crt", ABS_SRCDIR "/host2.key");
@@ -271,14 +271,12 @@ main (int argc, char *const *argv)
       fprintf (stderr, MHD_E_SERVER_INIT);
       return -1;
     }
-  if (0 != do_get ("https://host1:4233/"))
-    error_count++;
-  if (0 != do_get ("https://host2:4233/"))
-    error_count++;
+  error_count += do_get ("https://host1:4233/");
+  error_count += do_get ("https://host2:4233/");
 
   MHD_stop_daemon (d);
   curl_global_cleanup ();
-  return (0 != error_count) ? 1 : 0;
+  return error_count != 0;
 }
 
 
@@ -288,6 +286,6 @@ int main ()
 {
   fprintf (stderr,
            "SNI not supported by GnuTLS < 3.0\n");
-  return 77;
+  return 0;
 }
 #endif

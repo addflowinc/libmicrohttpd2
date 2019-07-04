@@ -15,12 +15,12 @@
 
      You should have received a copy of the GNU General Public License
      along with libmicrohttpd; see the file COPYING.  If not, write to the
-     Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
-     Boston, MA 02110-1301, USA.
+     Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+     Boston, MA 02111-1307, USA.
 */
 
 /**
- * @file test_process_headers.c
+ * @file daemontest_process_headers.c
  * @brief  Testcase for HTTP header access
  * @author Christian Grothoff
  */
@@ -305,12 +305,7 @@ testExternalGet ()
   fd_set rs;
   fd_set ws;
   fd_set es;
-  MHD_socket maxsock;
-#ifdef MHD_WINSOCK_SOCKETS
-  int maxposixs; /* Max socket number unused on W32 */
-#else  /* MHD_POSIX_SOCKETS */
-#define maxposixs maxsock
-#endif /* MHD_POSIX_SOCKETS */
+  MHD_socket max;
   int running;
   struct CURLMsg *msg;
   time_t start;
@@ -359,13 +354,12 @@ testExternalGet ()
   start = time (NULL);
   while ((time (NULL) - start < 5) && (multi != NULL))
     {
-      maxsock = MHD_INVALID_SOCKET;
-      maxposixs = -1;
+      max = 0;
       FD_ZERO (&rs);
       FD_ZERO (&ws);
       FD_ZERO (&es);
       curl_multi_perform (multi, &running);
-      mret = curl_multi_fdset (multi, &rs, &ws, &es, &maxposixs);
+      mret = curl_multi_fdset (multi, &rs, &ws, &es, &max);
       if (mret != CURLM_OK)
         {
           curl_multi_remove_handle (multi, c);
@@ -374,7 +368,7 @@ testExternalGet ()
           MHD_stop_daemon (d);
           return 2048;
         }
-      if (MHD_YES != MHD_get_fdset (d, &rs, &ws, &es, &maxsock))
+      if (MHD_YES != MHD_get_fdset (d, &rs, &ws, &es, &max))
         {
           curl_multi_remove_handle (multi, c);
           curl_multi_cleanup (multi);
@@ -384,7 +378,7 @@ testExternalGet ()
         }
       tv.tv_sec = 0;
       tv.tv_usec = 1000;
-      select (maxposixs + 1, &rs, &ws, &es, &tv);
+      select (max + 1, &rs, &ws, &es, &tv);
       curl_multi_perform (multi, &running);
       if (running == 0)
         {
@@ -428,8 +422,9 @@ main (int argc, char *const *argv)
 {
   unsigned int errorCount = 0;
 
-  oneone = (NULL != strrchr (argv[0], (int) '/')) ?
-    (NULL != strstr (strrchr (argv[0], (int) '/'), "11")) : 0;
+  oneone = NULL != strstr (argv[0], "11");
+  if (0 != curl_global_init (CURL_GLOBAL_WIN32))
+    return 2;
   errorCount += testInternalGet ();
   errorCount += testMultithreadedGet ();
   errorCount += testMultithreadedPoolGet ();

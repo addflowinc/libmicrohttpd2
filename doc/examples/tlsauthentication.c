@@ -98,13 +98,12 @@ load_file (const char *filename)
   if (!fp)
     return NULL;
 
-  buffer = malloc (size + 1);
+  buffer = malloc (size);
   if (!buffer)
     {
       fclose (fp);
       return NULL;
     }
-  buffer[size] = '\0';
 
   if (size != fread (buffer, 1, size, fp))
     {

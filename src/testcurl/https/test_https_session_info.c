@@ -1,6 +1,6 @@
 /*
  This file is part of libmicrohttpd
- Copyright (C) 2007, 2016 Christian Grothoff
+ Copyright (C) 2007 Christian Grothoff
 
  libmicrohttpd is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published
@@ -14,8 +14,8 @@
 
  You should have received a copy of the GNU General Public License
  along with libmicrohttpd; see the file COPYING.  If not, write to the
- Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
- Boston, MA 02110-1301, USA.
+ Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+ Boston, MA 02111-1307, USA.
  */
 
 /**
@@ -48,34 +48,22 @@ query_session_ahc (void *cls, struct MHD_Connection *connection,
 {
   struct MHD_Response *response;
   int ret;
-
+  
   if (NULL == *ptr)
     {
       *ptr = &query_session_ahc;
       return MHD_YES;
     }
 
-  if (GNUTLS_TLS1_1 !=
+  if (GNUTLS_SSL3 != 
       (ret = MHD_get_connection_info
        (connection,
 	MHD_CONNECTION_INFO_PROTOCOL)->protocol))
     {
-      if (GNUTLS_TLS1_2 == ret)
-      {
-        /* as usual, TLS implementations sometimes don't
-           quite do what was asked, just mildly complain... */
-        fprintf (stderr,
-                 "Warning: requested TLS 1.1, got TLS 1.2\n");
-      }
-      else
-      {
-        /* really different version... */
-        fprintf (stderr,
-                 "Error: requested protocol mismatch (wanted %d, got %d)\n",
-                 GNUTLS_TLS1_1,
-                 ret);
-        return -1;
-      }
+      fprintf (stderr, "Error: requested protocol mismatch (wanted %d, got %d)\n",
+               GNUTLS_SSL3,
+	       ret);
+      return -1;
     }
 
   response = MHD_create_response_from_buffer (strlen (EMPTY_PAGE),
@@ -90,7 +78,6 @@ query_session_ahc (void *cls, struct MHD_Connection *connection,
 /**
  * negotiate a secure connection with server & query negotiated security parameters
  */
-#if LIBCURL_VERSION_NUM >= 0x072200
 static int
 test_query_session ()
 {
@@ -135,7 +122,7 @@ test_query_session ()
   curl_easy_setopt (c, CURLOPT_WRITEFUNCTION, &copyBuffer);
   curl_easy_setopt (c, CURLOPT_FILE, &cbc);
   /* TLS options */
-  curl_easy_setopt (c, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_1);
+  curl_easy_setopt (c, CURLOPT_SSLVERSION, CURL_SSLVERSION_SSLv3);
   curl_easy_setopt (c, CURLOPT_SSL_CIPHER_LIST, aes256_sha);
   /* currently skip any peer authentication */
   curl_easy_setopt (c, CURLOPT_SSL_VERIFYPEER, 0);
@@ -162,13 +149,12 @@ test_query_session ()
   free (cbc.buf);
   return 0;
 }
-#endif
+
 
 int
 main (int argc, char *const *argv)
 {
   unsigned int errorCount = 0;
-  const char *ssl_version;
 
   gcry_control (GCRYCTL_ENABLE_QUICK_RANDOM, 0);
 #ifdef GCRYCTL_INITIALIZATION_FINISHED
@@ -179,21 +165,7 @@ main (int argc, char *const *argv)
       fprintf (stderr, "Error (code: %u)\n", errorCount);
       return -1;
     }
-
-  ssl_version = curl_version_info (CURLVERSION_NOW)->ssl_version;
-  if (NULL == ssl_version)
-  {
-    fprintf (stderr, "Curl does not support SSL.  Cannot run the test.\n");
-    return 77;
-  }
-  if (0 != strncmp (ssl_version, "GnuTLS", 6))
-  {
-    fprintf (stderr, "This test can be run only with libcurl-gnutls.\n");
-    return 77;
-  }
-#if LIBCURL_VERSION_NUM >= 0x072200
   errorCount += test_query_session ();
-#endif
   print_test_result (errorCount, argv[0]);
   curl_global_cleanup ();
   if (errorCount > 0)
